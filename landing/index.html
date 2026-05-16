@@ -30,7 +30,12 @@
   <script>
     const config = window.COACH_CHRIS_CONFIG || {};
     const PHONE = config.phoneNumber || "";
-    const smsLink = "sms:" + PHONE;
+    // Pre-fill the first message body so the user lands in Messages with the
+    // opener already typed. Saves the awkward "what do I say?" beat.
+    const FIRST_BODY = "Sup Coach Chris";
+    const smsLink = PHONE
+      ? "sms:" + PHONE + "?body=" + encodeURIComponent(FIRST_BODY)
+      : "";
 
     const textBtn = document.getElementById("text-btn");
     const phoneEl = document.getElementById("phone");
