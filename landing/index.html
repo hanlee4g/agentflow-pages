@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coach Chris</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+  <!-- qrcode-generator 1.4.4 (MIT). Vendored locally so the page works
+       offline / self-hosted with no CDN dependency. Refresh by re-running:
+         curl -fsSL https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js -o landing/qrcode.min.js -->
+  <script src="qrcode.min.js"></script>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <h1>Coach Chris</h1>
+      <p class="tagline">Your personal fitness coach, right in iMessage.</p>
+
+      <div class="qr-container">
+        <div id="qr" aria-label="QR code to text Coach Chris" role="img"></div>
+      </div>
+
+      <a id="text-btn" class="cta" href="#">Text Coach Chris</a>
+
+      <p class="phone" id="phone">Configure phone number before deploy</p>
+
+      <p class="footnote">iMessage only. Works on iPhone, iPad, and Mac.</p>
+    </div>
+  </main>
+
+  <script>
+    const config = window.COACH_CHRIS_CONFIG || {};
+    const PHONE = config.phoneNumber || "";
+    const smsLink = "sms:" + PHONE;
+
+    const textBtn = document.getElementById("text-btn");
+    const phoneEl = document.getElementById("phone");
+    if (PHONE) {
+      textBtn.href = smsLink;
+      phoneEl.textContent = formatPhone(PHONE);
+    } else {
+      textBtn.removeAttribute("href");
+      textBtn.textContent = "Phone number not configured";
+    }
+
+    function formatPhone(e164) {
+      const d = e164.replace(/\D/g, "");
+      if (d.length === 11) {
+        return `+${d[0]} (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+      }
+      return e164;
+    }
+
+    (function renderQR() {
+      const target = document.getElementById("qr");
+      if (!target) return;
+
+      if (!PHONE || typeof window.qrcode !== "function") {
+        target.style.background = "#111";
+        target.style.color = "#fff";
+        target.style.width = "200px";
+        target.style.height = "200px";
+        target.style.display = "flex";
+        target.style.alignItems = "center";
+        target.style.justifyContent = "center";
+        target.style.borderRadius = "12px";
+        target.style.fontFamily = "system-ui";
+        target.style.fontSize = "13px";
+        target.style.padding = "1rem";
+        target.style.textAlign = "center";
+        target.textContent = PHONE
+          ? "QR unavailable (offline?)"
+          : "Configure phone number";
+        return;
+      }
+
+      // qrcode-generator: typeNumber 0 (auto) + level "M" handles arbitrary
+      // sms: payload sizes. We then render to inline SVG so the QR scales
+      // crisply on retina/print.
+      const qr = window.qrcode(0, "M");
+      qr.addData(smsLink);
+      qr.make();
+      target.innerHTML = qr.createSvgTag({
+        cellSize: 6,
+        margin: 2,
+        scalable: true,
+      });
+
+      const svg = target.querySelector("svg");
+      if (svg) {
+        svg.setAttribute("width", "200");
+        svg.setAttribute("height", "200");
+        svg.style.background = "#fff";
+        svg.style.borderRadius = "8px";
+        svg.style.display = "block";
+      }
+    })();
+  </script>
+</body>
+</html>
