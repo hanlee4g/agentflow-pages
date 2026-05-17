@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coach Chris</title>
+  <script src="config.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0a0a0a;
+      color: #f5f5f5;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .loading { text-align: center; padding: 4rem 0; color: #888; }
+    .error { text-align: center; padding: 4rem 0; color: #ef4444; }
+
+    /* Workout plan styles */
+    .workout-plan { max-width: 600px; margin: 0 auto; }
+    .workout-plan h1 { font-size: 1.75rem; margin-bottom: 1.5rem; font-weight: 700; }
+    .section { margin-bottom: 2rem; }
+    .section h2 { font-size: 1.25rem; color: #a0a0a0; margin-bottom: 0.75rem; font-weight: 600; }
+    .exercise { background: #161616; border-radius: 10px; padding: 1rem; margin-bottom: 0.5rem; }
+    .exercise-name { font-weight: 600; margin-bottom: 0.25rem; }
+    .exercise-detail { font-size: 0.9rem; color: #888; }
+    .exercise-notes { font-size: 0.85rem; color: #666; margin-top: 0.25rem; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div class="loading">Loading...</div>
+  </div>
+
+  <script>
+    // ── Config ──
+    const FIREBASE_PROJECT = window.COACH_CHRIS_CONFIG?.firebaseProjectId || "";
+    const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
+
+    // ── Router ──
+    (async function main() {
+      const params = new URLSearchParams(window.location.search);
+      const linkId = params.get("id");
+      const root = document.getElementById("root");
+
+      if (!FIREBASE_PROJECT) {
+        root.innerHTML = '<div class="error">Firebase project is not configured.</div>';
+        return;
+      }
+
+      if (!linkId) {
+        root.innerHTML = '<div class="error">No link ID provided.</div>';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${FIRESTORE_BASE}/links/${linkId}`);
+        if (!res.ok) throw new Error("Link not found");
+        const doc = await res.json();
+        const fields = doc.fields;
+        const type = getStringField(fields, "type");
+        const payload = getMapField(fields, "payload");
+
+        switch (type) {
+          case "workout-plan":
+            renderWorkoutPlan(root, payload);
+            break;
+          default:
+            root.innerHTML = '<div class="error">Unknown link type.</div>';
+        }
+      } catch (err) {
+        root.innerHTML = `<div class="error">Could not load this page. It may have expired.</div>`;
+      }
+    })();
+
+    // ── Renderers ──
+
+    function renderWorkoutPlan(root, payload) {
+      const title = payload.title || "Workout Plan";
+      const sections = payload.sections || [];
+
+      let html = `<div class="workout-plan"><h1>${esc(title)}</h1>`;
+
+      for (const section of sections) {
+        html += `<div class="section"><h2>${esc(section.name || "")}</h2>`;
+        for (const ex of (section.exercises || [])) {
+          html += `<div class="exercise">`;
+          html += `<div class="exercise-name">${esc(ex.name || "")}</div>`;
+          const parts = [];
+          if (ex.sets) parts.push(`${ex.sets} sets`);
+          if (ex.reps) parts.push(`${ex.reps} reps`);
+          if (ex.weight) parts.push(ex.weight);
+          html += `<div class="exercise-detail">${esc(parts.join(" · "))}</div>`;
+          if (ex.notes) html += `<div class="exercise-notes">${esc(ex.notes)}</div>`;
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+      root.innerHTML = html;
+    }
+
+    // ── Firestore REST helpers ──
+    // Firestore REST returns typed field objects. These extract plain values.
+
+    function getStringField(fields, key) {
+      return fields?.[key]?.stringValue ?? "";
+    }
+
+    function getMapField(fields, key) {
+      const map = fields?.[key]?.mapValue?.fields;
+      if (!map) return {};
+      return parseFirestoreMap(map);
+    }
+
+    function parseFirestoreMap(fields) {
+      const result = {};
+      for (const [k, v] of Object.entries(fields)) {
+        result[k] = parseFirestoreValue(v);
+      }
+      return result;
+    }
+
+    function parseFirestoreValue(v) {
+      if (v.stringValue !== undefined) return v.stringValue;
+      if (v.integerValue !== undefined) return Number(v.integerValue);
+      if (v.doubleValue !== undefined) return v.doubleValue;
+      if (v.booleanValue !== undefined) return v.booleanValue;
+      if (v.nullValue !== undefined) return null;
+      if (v.arrayValue) return (v.arrayValue.values || []).map(parseFirestoreValue);
+      if (v.mapValue) return parseFirestoreMap(v.mapValue.fields || {});
+      return null;
+    }
+
+    function esc(str) {
+      const el = document.createElement("span");
+      el.textContent = str;
+      return el.innerHTML;
+    }
+  </script>
+</body>
+</html>
